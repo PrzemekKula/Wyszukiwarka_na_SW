@@ -1,4 +1,5 @@
 import pandas as pd
+import sqlite3
 
 file_path = 'C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/16k_Movies.csv'
 movies_df = pd.read_csv(file_path)
@@ -47,10 +48,14 @@ movies_df['No of Persons Voted'] = movies_df['No of Persons Voted'].replace({','
 movies_df['Popularity'] = movies_df['No of Persons Voted'].apply(pd.to_numeric, errors='coerce').apply(categorize_popularity)
 movies_df['Duration (minutes)'] = movies_df['Duration'].apply(convert_duration_to_minutes)
 movies_df.drop(columns=['Duration'], inplace=True)
-"""
 
 updated_file_path = 'C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/16k_Movies.csv'
 movies_df.to_csv(updated_file_path, index=False)
+"""
 
+# Zapis danych do bazy SQLite
+conn = sqlite3.connect('C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/movies_database.db')
+movies_df.to_sql('movies', conn, if_exists='replace', index=False)
+conn.close()
 
 
