@@ -1,8 +1,11 @@
 import pandas as pd
 import sqlite3
+from flask import Flask, render_template, request
 
+"""
 file_path = 'C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/16k_Movies.csv'
 movies_df = pd.read_csv(file_path)
+"""
 
 def categorize_rating(rating):
     if rating >= 8.0:
@@ -53,9 +56,69 @@ updated_file_path = 'C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/16k_Movies.csv'
 movies_df.to_csv(updated_file_path, index=False)
 """
 
+"""
 # Zapis danych do bazy SQLite
 conn = sqlite3.connect('C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/movies_database.db')
 movies_df.to_sql('movies', conn, if_exists='replace', index=False)
 conn.close()
+"""
 
+# Ścieżka do bazy SQLite
+db_path = 'C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/movies_database.db'
 
+app = Flask(__name__)
+
+# Strona główna
+@app.route('/')
+def home():
+    return '''
+    <h1>Witaj w wyszukiwarce filmów!</h1>
+    <p>Wybierz jedną z poniższych opcji:</p>
+    <a href="/search"><button>Wyszukaj filmy</button></a>
+    <a href="/movie/1"><button>Losowy film</button></a>
+    '''
+
+# Endpoint dla wyszukiwania
+@app.route('/search')
+def search():
+    query = request.args.get('query', '')
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    if query:
+        cursor.execute("SELECT * FROM movies WHERE Title LIKE ?", (f"%{query}%",))
+        results = cursor.fetchall()
+    else:
+        cursor.execute("SELECT * FROM movies LIMIT 10")
+        results = cursor.fetchall()
+    conn.close()
+
+    result_html = "<h1>Wyniki wyszukiwania</h1><ul>"
+    for row in results:
+        result_html += f"<li>{row[1]} ({row[2]}) - <a href='/movie/{row[0]}'>Szczegóły</a></li>"
+    result_html += "</ul><a href='/'><button>Powrót na stronę główną</button></a>"
+
+    return result_html
+
+# Endpoint dla szczegółowych informacji o filmie
+@app.route('/movie/<int:movie_id>')
+def movie_details(movie_id):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM movies WHERE ID = ?", (movie_id,))
+    movie = cursor.fetchone()
+    conn.close()
+
+    if movie:
+        return f'''
+        <h1>Szczegóły filmu</h1>
+        <p><strong>Tytuł:</strong> {movie[1]}</p>
+        <p><strong>Rok:</strong> {movie[2]}</p>
+        <p><strong>Opis:</strong> {movie[3]}</p>
+        <a href="/search"><button>Wyszukaj filmy</button></a>
+        <a href="/"><button>Powrót na stronę główną</button></a>
+        '''
+    else:
+        return "<h1>Film nie znaleziony</h1><a href='/'><button>Powrót na stronę główną</button></a>"
+
+if __name__ == "__main__":
+    app.run(debug=True)
