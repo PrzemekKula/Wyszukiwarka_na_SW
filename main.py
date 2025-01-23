@@ -79,25 +79,34 @@ def home():
     '''
 
 # Endpoint dla wyszukiwania
-@app.route('/search')
+@app.route('/search', methods=['GET', 'POST'])
 def search():
-    query = request.args.get('query', '')
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    if query:
+    results = []
+    message = ""
+    if request.method == 'POST':
+        query = request.form.get('query', '')
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM movies WHERE Title LIKE ?", (f"%{query}%",))
         results = cursor.fetchall()
-    else:
-        cursor.execute("SELECT * FROM movies LIMIT 10")
-        results = cursor.fetchall()
-    conn.close()
+        conn.close()
 
-    result_html = "<h1>Wyniki wyszukiwania</h1><ul>"
-    for row in results:
-        result_html += f"<li>{row[1]} ({row[2]}) - <a href='/movie/{row[0]}'>Szczegóły</a></li>"
-    result_html += "</ul><a href='/'><button>Powrót na stronę główną</button></a>"
+        if not results:
+            message = "<p>Nie znaleziono żadnych filmów pasujących do zapytania.</p>"
 
-    return result_html
+    return f'''
+    <h1>Wyszukiwarka filmów</h1>
+    <form method="POST">
+        <label for="query">Wpisz tytuł filmu:</label><br>
+        <input type="text" id="query" name="query" placeholder="Wpisz tytuł">
+        <button type="submit">Szukaj</button>
+    </form>
+    {message}
+    <ul>
+        {''.join(f"<li>{row[1]} ({row[2]}) - <a href='/movie/{row[0]}'>Szczegóły</a></li>" for row in results)}
+    </ul>
+    <a href='/'><button>Powrót na stronę główną</button></a>
+    '''
 
 # Endpoint dla szczegółowych informacji o filmie
 @app.route('/movie/<int:movie_id>')
