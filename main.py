@@ -100,7 +100,12 @@ def search():
             exact_matches = [movie for movie in all_movies if movie[1].lower() == query.lower()]
 
             if exact_matches:
-                results = exact_matches
+                other_movies = [
+                    movie for movie in all_movies
+                    if movie not in exact_matches
+                ]
+                other_movies = sorted(other_movies, key=lambda movie: movie[1].lower())
+                results = exact_matches + other_movies
             else:
                 results = sorted(
                     all_movies,
@@ -108,6 +113,7 @@ def search():
                 )
                 results = [movie for movie in results if Levenshtein.distance(query.lower(), movie[1].lower()) <= 5]
                 results = results[:5]
+                results = sorted(results, key=lambda movie: movie[1].lower())
 
         # Filtrowanie po zakresie lat
         if year_min or year_max:
@@ -123,6 +129,7 @@ def search():
                     movie for movie in results
                     if (year_min is None or movie[2] >= year_min) and (year_max is None or movie[2] <= year_max)
                 ]
+                results = sorted(results, key=lambda movie: movie[1].lower())
             except ValueError:
                 message = "<p>Nieprawidłowy zakres lat.</p>"
 
@@ -170,3 +177,4 @@ def movie_details(movie_id):
 
 if __name__ == "__main__":
     app.run(debug=True)
+
