@@ -86,29 +86,45 @@ def search():
     message = ""
     if request.method == 'POST':
         query = request.form.get('query', '').strip()
+        year_min = request.form.get('year_min', '').strip()
+        year_max = request.form.get('year_max', '').strip()
+
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT ID, Title, Year FROM movies")
         all_movies = cursor.fetchall()
         conn.close()
 
+        # Filtrowanie po tytule
         if query:
-            # Sprawdź dokładne dopasowania
             exact_matches = [movie for movie in all_movies if movie[1].lower() == query.lower()]
 
-            # Jeśli są dokładne dopasowania, wyświetl je jako pierwsze
             if exact_matches:
                 results = exact_matches
             else:
-                # Oblicz odległość Levenshteina i sortuj wyniki
                 results = sorted(
                     all_movies,
                     key=lambda movie: Levenshtein.distance(query.lower(), movie[1].lower())
                 )
-                # Filtruj wyniki, aby uwzględnić tylko te z akceptowalnym poziomem podobieństwa
                 results = [movie for movie in results if Levenshtein.distance(query.lower(), movie[1].lower()) <= 5]
-                # Ogranicz do 5 wyników
                 results = results[:5]
+
+        # Filtrowanie po zakresie lat
+        if year_min or year_max:
+            try:
+                year_min = int(year_min) if year_min else None
+                year_max = int(year_max) if year_max else None
+
+                # Jeśli brak zapytania, weź wszystkie filmy i filtruj tylko po latach
+                if not query:
+                    results = all_movies
+
+                results = [
+                    movie for movie in results
+                    if (year_min is None or movie[2] >= year_min) and (year_max is None or movie[2] <= year_max)
+                ]
+            except ValueError:
+                message = "<p>Nieprawidłowy zakres lat.</p>"
 
         if not results:
             message = "<p>Nie znaleziono żadnych filmów pasujących do zapytania.</p>"
@@ -117,7 +133,11 @@ def search():
     <h1>Wyszukiwarka filmów</h1>
     <form method="POST">
         <label for="query">Wpisz tytuł filmu:</label><br>
-        <input type="text" id="query" name="query" placeholder="Wpisz tytuł">
+        <input type="text" id="query" name="query" placeholder="Wpisz tytuł"><br>
+        <label for="year_min">Rok od:</label>
+        <input type="number" id="year_min" name="year_min" placeholder="Podaj rok początkowy"><br>
+        <label for="year_max">Rok do:</label>
+        <input type="number" id="year_max" name="year_max" placeholder="Podaj rok końcowy"><br>
         <button type="submit">Szukaj</button>
     </form>
     {message}
