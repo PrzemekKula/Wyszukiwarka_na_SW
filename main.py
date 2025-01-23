@@ -1,6 +1,7 @@
 import pandas as pd
 import sqlite3
 from flask import Flask, render_template, request
+import Levenshtein
 
 """
 file_path = 'C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/16k_Movies.csv'
@@ -84,12 +85,30 @@ def search():
     results = []
     message = ""
     if request.method == 'POST':
-        query = request.form.get('query', '')
+        query = request.form.get('query', '').strip()
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM movies WHERE Title LIKE ?", (f"%{query}%",))
-        results = cursor.fetchall()
+        cursor.execute("SELECT ID, Title, Year FROM movies")
+        all_movies = cursor.fetchall()
         conn.close()
+
+        if query:
+            # Sprawdź dokładne dopasowania
+            exact_matches = [movie for movie in all_movies if movie[1].lower() == query.lower()]
+
+            # Jeśli są dokładne dopasowania, wyświetl je jako pierwsze
+            if exact_matches:
+                results = exact_matches
+            else:
+                # Oblicz odległość Levenshteina i sortuj wyniki
+                results = sorted(
+                    all_movies,
+                    key=lambda movie: Levenshtein.distance(query.lower(), movie[1].lower())
+                )
+                # Filtruj wyniki, aby uwzględnić tylko te z akceptowalnym poziomem podobieństwa
+                results = [movie for movie in results if Levenshtein.distance(query.lower(), movie[1].lower()) <= 5]
+                # Ogranicz do 5 wyników
+                results = results[:5]
 
         if not results:
             message = "<p>Nie znaleziono żadnych filmów pasujących do zapytania.</p>"
