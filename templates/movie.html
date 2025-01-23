@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="eng">
+<head>
+    <meta charset="UTF-8">
+    <title>Movie details</title>
+</head>
+<body>
+    {% if movie %}
+    <h1>Movie details</h1>
+    <p><strong>ID:</strong> {{ movie.id }}</p>
+    <p><strong>Title:</strong> {{ movie.title }}</p>
+    <p><strong>Release year:</strong> {{ movie.year }}</p>
+    <p><strong>Description:</strong> {{ movie.description }}</p>
+    {% else %}
+    <h1>Movie not found</h1>
+    {% endif %}
+    
+    <a href="{{ url_for('search') }}"><button>Return</button></a>
+    <a href="{{ url_for('home') }}"><button>Main page</button></a>
+</body>
+</html>

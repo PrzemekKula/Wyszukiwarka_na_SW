@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="eng">
+<head>
+    <meta charset="UTF-8">
+    <title>Movie search engine</title>
+</head>
+<body>
+    <h1>Movie search engine</h1>
+    
+    <!-- Formularz -->
+    {% if show_form %}
+    <form method="POST">
+        <label>Enter movie's title:</label><br>
+        <input type="text" name="query" placeholder="Search..." /><br><br>
+
+        <label>Year:</label>
+        
+        <input type="number" name="year_min" placeholder="from"><br><br>
+
+        <label></label>
+        <input type="number" name="year_max" placeholder="to"><br><br>
+
+        <button type="submit">Search</button>
+    </form>
+    {% endif %}
+    
+    <!-- Komunikat lub wyniki -->
+    {% if message %}
+    <div style="margin-top:20px;">
+        {{ message|safe }}
+    </div>
+    {% endif %}
+
+    {% if results %}
+    <ul>
+        {% for result_item in results %}
+        <li>{{ result_item|safe }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <a href="{{ url_for('home') }}"><button>Main page</button></a>
+</body>
+</html>

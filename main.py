@@ -1,180 +1,178 @@
-import pandas as pd
+import re
 import sqlite3
-from flask import Flask, render_template, request
-import Levenshtein
-
-"""
-file_path = 'C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/16k_Movies.csv'
-movies_df = pd.read_csv(file_path)
-"""
-
-def categorize_rating(rating):
-    if rating >= 8.0:
-        return "Excellent"
-    elif rating >= 6.0:
-        return "Good"
-    else:
-        return "Poor"
-
-def categorize_popularity(votes):
-    if votes >= 1000:
-        return "Very popular"
-    elif votes >= 500:
-        return "Popular"
-    else:
-        return " Unpopular"
-
-def convert_duration_to_minutes(duration):
-    if pd.isna(duration) or not isinstance(duration, str):
-        return None
-    try:
-        hours, minutes = 0, 0
-        if 'h' in duration:
-            parts = duration.split('h')
-            hours = int(parts[0].strip()) if parts[0].strip() else 0
-            minutes = int(parts[1].replace('m', '').strip()) if 'm' in parts[1] and parts[1].strip() else 0
-        elif 'm' in duration:
-            minutes = int(duration.replace('m', '').strip()) if duration.strip() else 0
-        return hours * 60 + minutes
-    except (IndexError, ValueError):
-        return None
-
-"""
-movies_df.rename(columns={'Release Date': 'Year'}, inplace=True)
-movies_df['Year'] = pd.to_datetime(movies_df['Year'], errors='coerce').dt.year
-movies_df.rename(columns={'Unnamed: 0': 'ID'}, inplace=True)
-movies_df = movies_df.drop_duplicates(subset=['Title'])
-movies_df.reset_index(drop=True, inplace=True)
-movies_df['ID'] = movies_df.index + 1
-movies_df['Decade'] = (movies_df['Year'] // 10 * 10).astype('Int64').astype(str) + 's'
-movies_df['Rating Category'] = movies_df['Rating'].apply(categorize_rating)
-movies_df['No of Persons Voted'] = movies_df['No of Persons Voted'].replace({',': ''}, regex=True).apply(pd.to_numeric, errors='coerce')
-movies_df['Popularity'] = movies_df['No of Persons Voted'].apply(pd.to_numeric, errors='coerce').apply(categorize_popularity)
-movies_df['Duration (minutes)'] = movies_df['Duration'].apply(convert_duration_to_minutes)
-movies_df.drop(columns=['Duration'], inplace=True)
-
-updated_file_path = 'C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/16k_Movies.csv'
-movies_df.to_csv(updated_file_path, index=False)
-"""
-
-"""
-# Zapis danych do bazy SQLite
-conn = sqlite3.connect('C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/movies_database.db')
-movies_df.to_sql('movies', conn, if_exists='replace', index=False)
-conn.close()
-"""
-
-# Ścieżka do bazy SQLite
-db_path = 'C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/movies_database.db'
+import pandas as pd
+from flask import Flask, request, render_template, url_for
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from scipy.sparse import csr_matrix
 
 app = Flask(__name__)
 
-# Strona główna
+# Globalne zmienne
+movies_data = None         # DataFrame z filmami (ID, Title, Year, Description)
+tfidf_matrix = None        # Macierz TF-IDF
+vectorizer = None          # Obiekt TfidfVectorizer
+
+db_path = "C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/movies_database.db"
+
+def load_data_and_build_tfidf():
+    """
+    Jednorazowo wczytuje dane z bazy SQLite i tworzy macierz TF-IDF z wzmocnionym tytułem (2x).
+    """
+    conn = sqlite3.connect(db_path)
+    query = "SELECT ID, Title, Year, Description FROM movies"
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+
+    # Uzupełniamy puste wartości
+    df["Title"] = df["Title"].fillna("")
+    df["Description"] = df["Description"].fillna("")
+
+    # Budujemy listę tekstów do wektoryzacji (wzmacniamy tytuł 2×)
+    docs = []
+    for _, row in df.iterrows():
+        title = row["Title"]
+        description = row["Description"]
+        weighted_title = (title + " ") * 3  # wzmocnienie tytułu 3x
+        full_text = weighted_title + description
+        docs.append(full_text)
+
+    # Tworzymy TfidfVectorizer ze stop_words='english'
+    vect = TfidfVectorizer(stop_words='english')
+    tfidf = vect.fit_transform(docs)
+
+    return df, tfidf, vect
+
+def highlight_terms(text, query):
+    """
+    Podkreśla (pogrubia) każde wystąpienie słów z `query` w danym `text` za pomocą <b>...</b>.
+    Działa bez rozróżniania wielkości liter i wyszukuje całe słowa (\b).
+    """
+    terms = query.split()
+    for t in terms:
+        pattern = re.compile(r"\b(" + re.escape(t) + r")\b", re.IGNORECASE)
+        text = pattern.sub(r"<b>\1</b>", text)
+    return text
+
 @app.route('/')
 def home():
-    return '''
-    <h1>Witaj w wyszukiwarce filmów!</h1>
-    <p>Wybierz jedną z poniższych opcji:</p>
-    <a href="/search"><button>Wyszukaj filmy</button></a>
-    <a href="/movie/1"><button>Losowy film</button></a>
-    '''
+    """
+    Strona główna: renderujemy szablon templates/home.html
+    """
+    return render_template('home.html')
 
-# Endpoint dla wyszukiwania
 @app.route('/search', methods=['GET', 'POST'])
 def search():
-    results = []
-    message = ""
+    global movies_data, tfidf_matrix, vectorizer
+
     if request.method == 'POST':
-        query = request.form.get('query', '').strip()
+        user_query = request.form.get('query', '').strip()
         year_min = request.form.get('year_min', '').strip()
         year_max = request.form.get('year_max', '').strip()
 
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT ID, Title, Year FROM movies")
-        all_movies = cursor.fetchall()
-        conn.close()
+        # Filtrowanie DataFrame po roku
+        df_filtered = movies_data.copy()
+        try:
+            year_min = int(year_min) if year_min else None
+            year_max = int(year_max) if year_max else None
+        except ValueError:
+            return render_template('search.html',
+                                   show_form=True,
+                                   message="<p>Nieprawidłowy zakres lat (podaj liczby całkowite).</p>")
 
-        # Filtrowanie po tytule
-        if query:
-            exact_matches = [movie for movie in all_movies if movie[1].lower() == query.lower()]
+        if year_min is not None:
+            df_filtered = df_filtered[df_filtered["Year"] >= year_min]
+        if year_max is not None:
+            df_filtered = df_filtered[df_filtered["Year"] <= year_max]
 
-            if exact_matches:
-                other_movies = [
-                    movie for movie in all_movies
-                    if movie not in exact_matches
-                ]
-                other_movies = sorted(other_movies, key=lambda movie: movie[1].lower())
-                results = exact_matches + other_movies
-            else:
-                results = sorted(
-                    all_movies,
-                    key=lambda movie: Levenshtein.distance(query.lower(), movie[1].lower())
-                )
-                results = [movie for movie in results if Levenshtein.distance(query.lower(), movie[1].lower()) <= 5]
-                results = results[:5]
-                results = sorted(results, key=lambda movie: movie[1].lower())
+        if df_filtered.empty:
+            return render_template('search.html',
+                                   show_form=True,
+                                   message="<p>Brak filmów w podanym zakresie lat.</p>")
 
-        # Filtrowanie po zakresie lat
-        if year_min or year_max:
-            try:
-                year_min = int(year_min) if year_min else None
-                year_max = int(year_max) if year_max else None
+        # Jeśli zapytanie puste, zwracamy top 10 alfabetycznie
+        if not user_query:
+            # Sortujemy alfabetycznie (np. aby mieć jakąś kolejność)
+            df_filtered = df_filtered.sort_values("Title")
+            total_found = len(df_filtered)
 
-                # Jeśli brak zapytania, weź wszystkie filmy i filtruj tylko po latach
-                if not query:
-                    results = all_movies
+            # Budujemy listę (BEZ limitu 10)
+            results_list = []
+            for _, row in df_filtered.iterrows():
+                line = f"{row['Title']} ({row['Year']}) - "
+                line += f"<a href='{url_for('movie_details', movie_id=row['ID'])}'>Szczegóły</a>"
+                results_list.append(line)
 
-                results = [
-                    movie for movie in results
-                    if (year_min is None or movie[2] >= year_min) and (year_max is None or movie[2] <= year_max)
-                ]
-                results = sorted(results, key=lambda movie: movie[1].lower())
-            except ValueError:
-                message = "<p>Nieprawidłowy zakres lat.</p>"
+            msg = f"<p>Znaleziono filmów: {total_found} (bez limitu, bo nie podano zapytania).</p>"
+            return render_template('search.html',
+                                   show_form=True,
+                                   message=msg,
+                                   results=results_list)
 
-        if not results:
-            message = "<p>Nie znaleziono żadnych filmów pasujących do zapytania.</p>"
+        # Wyszukiwanie TF-IDF
+        from scipy.sparse import csr_matrix
+        filtered_indices = df_filtered.index.tolist()
+        sub_tfidf_matrix = csr_matrix(tfidf_matrix[filtered_indices, :])
 
-    return f'''
-    <h1>Wyszukiwarka filmów</h1>
-    <form method="POST">
-        <label for="query">Wpisz tytuł filmu:</label><br>
-        <input type="text" id="query" name="query" placeholder="Wpisz tytuł"><br>
-        <label for="year_min">Rok od:</label>
-        <input type="number" id="year_min" name="year_min" placeholder="Podaj rok początkowy"><br>
-        <label for="year_max">Rok do:</label>
-        <input type="number" id="year_max" name="year_max" placeholder="Podaj rok końcowy"><br>
-        <button type="submit">Szukaj</button>
-    </form>
-    {message}
-    <ul>
-        {''.join(f"<li>{row[1]} ({row[2]}) - <a href='/movie/{row[0]}'>Szczegóły</a></li>" for row in results)}
-    </ul>
-    <a href='/'><button>Powrót na stronę główną</button></a>
-    '''
+        query_vec = vectorizer.transform([user_query])
+        similarities = cosine_similarity(query_vec, sub_tfidf_matrix).flatten()
 
-# Endpoint dla szczegółowych informacji o filmie
+        # Sort malejąco
+        ranked_indices = similarities.argsort()[::-1]
+
+        # Tylko filmy z similarity >= 0.4
+        ranked_indices = [idx for idx in ranked_indices if similarities[idx] >= 0.4]
+
+        total_found = len(ranked_indices)
+        if total_found == 0:
+            return render_template('search.html',
+                                   show_form=True,
+                                   message="<p>Brak filmów z similarity >= 0.4.</p>")
+
+        # Ograniczamy do top 10
+        top_10_indices = ranked_indices[:10]
+
+        # Budowa listy wyników
+        results_list = []
+        for idx_in_sub in top_10_indices:
+            real_index = filtered_indices[idx_in_sub]
+            row = movies_data.loc[real_index]
+            sim_score = similarities[idx_in_sub]
+            # Pogrubianie tytułu
+            title_with_highlight = highlight_terms(row['Title'], user_query)
+
+            line = f"{title_with_highlight} ({row['Year']}) - [similarity={sim_score:.3f}] - "
+            line += f"<a href='{url_for('movie_details', movie_id=row['ID'])}'>Szczegóły</a>"
+            results_list.append(line)
+
+        msg = f"<p>Znaleziono w sumie {total_found} filmów (similarity >= 0.4). Pokazuję max 10.</p>"
+        return render_template('search.html',
+                               show_form=True,
+                               message=msg,
+                               results=results_list)
+
+    # Metoda GET – wyświetlamy formularz (bez wyników)
+    return render_template('search.html', show_form=True)
+
 @app.route('/movie/<int:movie_id>')
 def movie_details(movie_id):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM movies WHERE ID = ?", (movie_id,))
+    cursor.execute("SELECT ID, Title, Year, Description FROM movies WHERE ID = ?", (movie_id,))
     movie = cursor.fetchone()
     conn.close()
 
     if movie:
-        return f'''
-        <h1>Szczegóły filmu</h1>
-        <p><strong>Tytuł:</strong> {movie[1]}</p>
-        <p><strong>Rok:</strong> {movie[2]}</p>
-        <p><strong>Opis:</strong> {movie[3]}</p>
-        <a href="/search"><button>Wyszukaj filmy</button></a>
-        <a href="/"><button>Powrót na stronę główną</button></a>
-        '''
+        movie_dict = {
+            'id': movie[0],
+            'title': movie[1],
+            'year': movie[2],
+            'description': movie[3]
+        }
+        return render_template('movie.html', movie=movie_dict)
     else:
-        return "<h1>Film nie znaleziony</h1><a href='/'><button>Powrót na stronę główną</button></a>"
+        return render_template('movie.html', movie=None)
 
 if __name__ == "__main__":
+    movies_data, tfidf_matrix, vectorizer = load_data_and_build_tfidf()
     app.run(debug=True)
-
