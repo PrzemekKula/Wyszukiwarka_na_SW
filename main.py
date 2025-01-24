@@ -140,16 +140,26 @@ def movie_details(movie_id):
     Wyświetla szczegóły filmu na podstawie ID.
     """
     conn = sqlite3.connect(db_path)
-    query = "SELECT ID, Title, Year, Description FROM movies WHERE ID = ?"    
+    query = """
+        SELECT Title, Year, Genres, [Duration (minutes)], [Directed by], [Written by], 
+            Rating, [No of Persons Voted], Description
+        FROM movies
+        WHERE ID = ?
+    """
     movie = conn.execute(query, (movie_id,)).fetchone()
     conn.close()
 
     if movie:
         movie_dict = {
-            'id': movie[0],
-            'title': movie[1],
-            'year': movie[2],
-            'description': movie[3]
+            'title': movie[0],
+            'year': movie[1],
+            'genres': movie[2],
+            'duration': movie[3],
+            'directed_by': movie[4],
+            'written_by': movie[5],
+            'rating': movie[6],
+            'votes': movie[7],
+            'description': movie[8]
         }
         return render_template('movie.html', movie=movie_dict)
     else:
@@ -221,8 +231,9 @@ def search():
             similarity = similarities[local_idx]
             highlighted_title = highlight_terms(row['Title'], user_query)
             results.append(f"""
+                {highlighted_title} ({row['Year']}) [similarity={similarity:.2f}]
                 <a href="{url_for('movie_details', movie_id=row['ID'])}">
-                    {highlighted_title} ({row['Year']}) [similarity={similarity:.2f}]
+                    <button>Details</button>
                 </a>
             """)
 

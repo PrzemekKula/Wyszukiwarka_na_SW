@@ -2,20 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Movie details</title>
+    <title>Movie Details</title>
 </head>
 <body>
     {% if movie %}
-    <h1>Movie details</h1>
-    <p><strong>ID:</strong> {{ movie.id }}</p>
+    <h1>Movie Details</h1>
     <p><strong>Title:</strong> {{ movie.title }}</p>
-    <p><strong>Release year:</strong> {{ movie.year }}</p>
+    <p><strong>Year:</strong> {{ movie.year }}</p>
+    <p><strong>Genres:</strong> {{ movie.genres }}</p>
+    <p><strong>Duration:</strong> {{ movie.duration }} minutes</p>
+    <p><strong>Directed by:</strong> {{ movie.directed_by }}</p>
+    <p><strong>Written by:</strong> {{ movie.written_by }}</p>
+    <p><strong>Rating:</strong> {{ movie.rating }}</p>
+    <p><strong>Number of Votes:</strong> {{ movie.votes }}</p>
     <p><strong>Description:</strong> {{ movie.description }}</p>
     {% else %}
-    <h1>Movie not found</h1>
+    <h1>Movie Not Found</h1>
     {% endif %}
     
-    <a href="{{ url_for('search') }}"><button>Return</button></a>
-    <a href="{{ url_for('home') }}"><button>Main page</button></a>
+    <a href="{{ url_for('search') }}"><button>Return to Search</button></a>
+    <a href="{{ url_for('home') }}"><button>Main Page</button></a>
 </body>
 </html>
