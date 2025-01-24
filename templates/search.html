@@ -20,6 +20,13 @@
         <label></label>
         <input type="number" name="year_max" placeholder="to"><br><br>
 
+        <label>Choose type of similarity:</label>
+        <select name="measure">
+            <option value="cosine">Cosine measure(TF-IDF)</option>
+            <option value="jaccard">Jaccard Index (set-based)</option>
+            <option value="lsi">LSI (SVD + cosinus)</option>
+        </select><br><br>
+
         <button type="submit">Search</button>
     </form>
     {% endif %}
