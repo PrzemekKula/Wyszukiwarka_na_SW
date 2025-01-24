@@ -43,7 +43,7 @@ def load_data_and_build_tfidf():
 
     df["Title"] = df["Title"].fillna("")
     df["Description"] = df["Description"].fillna("")
-    
+
     # Pobierz listę stopwords
     try:
         stop_words = set(stopwords.words('english'))
@@ -89,7 +89,7 @@ def load_data_and_build_tfidf():
 
 def highlight_terms(text, query):
     """
-    Podkreśla (pogrubia) każde wystąpienie słów z `query` w danym `text`.
+    Podkreśla (pogrubia) każde wystąpienie słów z query w danym text.
     """
     terms = query.split()
     for t in terms:
@@ -110,17 +110,51 @@ def jaccard_similarity(setA: set, setB: set) -> float:
 def correct_query(user_query, vocabulary):
     """
     Poprawia literówki w zapytaniu użytkownika na podstawie listy słów (vocabulary).
+    Używa dynamicznego progu akceptacji poprawy w zależności od długości słowa.
     """
     corrected_words = []
     for word in user_query.split():
-        closest_word = min(vocabulary, key=lambda v: distance(word, v))
-        corrected_words.append(closest_word)
+        # Jeśli słowo istnieje w słowniku, nie poprawiaj
+        if word in vocabulary:
+            corrected_words.append(word)
+        else:
+            # Znajdź najbliższe słowo w słowniku
+            closest_word = min(vocabulary, key=lambda v: distance(word, v))
+            
+            # Ustal dynamiczny próg akceptacji poprawy
+            max_distance = max(2, len(word) // 3)  # Dla krótkich słów tolerancja wynosi co najmniej 2
+            if distance(word, closest_word) <= max_distance:
+                corrected_words.append(closest_word)
+            else:
+                # Jeśli nie znaleziono bliskiego dopasowania, zostaw oryginalne słowo
+                corrected_words.append(word)
     return " ".join(corrected_words)
 
 @app.route('/')
 def home():
     return render_template('home.html')
 
+@app.route('/movie/<int:movie_id>')
+def movie_details(movie_id):
+    """
+    Wyświetla szczegóły filmu na podstawie ID.
+    """
+    conn = sqlite3.connect(db_path)
+    query = "SELECT ID, Title, Year, Description FROM movies WHERE ID = ?"    
+    movie = conn.execute(query, (movie_id,)).fetchone()
+    conn.close()
+
+    if movie:
+        movie_dict = {
+            'id': movie[0],
+            'title': movie[1],
+            'year': movie[2],
+            'description': movie[3]
+        }
+        return render_template('movie.html', movie=movie_dict)
+    else:
+        return render_template('movie.html', movie=None)
+    
 @app.route('/search', methods=['GET', 'POST'])
 def search():
     global movies_data, doc_sets, tfidf_matrix, vectorizer
@@ -131,6 +165,7 @@ def search():
         year_min = request.form.get('year_min', '').strip()
         year_max = request.form.get('year_max', '').strip()
         measure = request.form.get('measure', 'cosine')
+        user_query = user_query.lower()
 
         # Stwórz słownik słów z danych
         vocabulary = set(" ".join(movies_data['Title']).lower().split())
@@ -185,7 +220,11 @@ def search():
             row = df_filtered.loc[real_index]
             similarity = similarities[local_idx]
             highlighted_title = highlight_terms(row['Title'], user_query)
-            results.append(f"{highlighted_title} ({row['Year']}) [similarity={similarity:.2f}]")
+            results.append(f"""
+                <a href="{url_for('movie_details', movie_id=row['ID'])}">
+                    {highlighted_title} ({row['Year']}) [similarity={similarity:.2f}]
+                </a>
+            """)
 
         return render_template('search.html', show_form=True, message=message, results=results)
 
