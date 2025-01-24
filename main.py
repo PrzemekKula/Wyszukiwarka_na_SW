@@ -22,7 +22,7 @@ tfidf_matrix = None      # Macierz TF-IDF
 vectorizer = None        # Obiekt TfidfVectorizer
 doc_lsi = None           # Macierz wektorów w przestrzeni LSI (n_docs x n_components)
 lsi_pipeline = None      # Pipeline: TruncatedSVD + Normalizer
-db_path = "C:/Users/DELL/Desktop/Wyszukiwarka_na_SW/movies_database.db"
+db_path = "movies_database.db"
 
 def load_data_and_build_tfidf():
     """
@@ -43,14 +43,13 @@ def load_data_and_build_tfidf():
 
     df["Title"] = df["Title"].fillna("")
     df["Description"] = df["Description"].fillna("")
-
+    
     # Pobierz listę stopwords
     try:
         stop_words = set(stopwords.words('english'))
     except LookupError:
         nltk.download('stopwords')
         stop_words = set(stopwords.words('english'))
-
 
     # Budujemy listę tekstów (wzmacniamy tytuł 3×)
     texts = []
@@ -144,6 +143,11 @@ def search():
             user_query = corrected_query
         else:
             message = None
+
+        # Filtracja stopwords w zapytaniu użytkownika
+        stop_words = set(stopwords.words('english'))
+        user_query_tokens = [t for t in user_query.lower().split() if t not in stop_words]
+        user_query = " ".join(user_query_tokens)
 
         # Filtrowanie danych po roku
         df_filtered = movies_data.copy()
