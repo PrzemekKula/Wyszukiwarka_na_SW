@@ -1,6 +1,76 @@
-<h1>Movie search engine</h1>
-<p>To start searching click <a href="{{ url_for('search') }}">HERE</a>.</p>
-<!-- Przycisk przenoszący do /statistics -->
-<button onclick="window.location.href='{{ url_for('statistics_view') }}'">
-    Show Statistics
-</button>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Search Engine</title>
+    <style>
+        /* Ogólne style */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        /* Nagłówek */
+        h1 {
+            color: #4a90e2;
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+
+        /* Paragraf i link */
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+        }
+
+        a {
+            text-decoration: none;
+            color: #4a90e2;
+            font-weight: bold;
+        }
+
+        a:hover {
+            color: #0056b3;
+        }
+
+        /* Przycisk */
+        button {
+            font-size: 1rem;
+            padding: 10px 20px;
+            margin-top: 20px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        button:hover {
+            background-color: #357ab8;
+            transform: scale(1.05);
+        }
+
+        button:active {
+            background-color: #2c6399;
+        }
+    </style>
+</head>
+<body>
+    <h1>Movie Search Engine</h1>
+    <p>To start searching click <a href="{{ url_for('search') }}">HERE</a>.</p>
+    <!-- Przycisk przenoszący do /statistics -->
+    <button onclick="window.location.href='{{ url_for('statistics_view') }}'">
+        Show Statistics
+    </button>
+</body>
+</html>
