@@ -14,11 +14,17 @@
         <input type="text" name="query" placeholder="Search..." /><br><br>
 
         <label>Year:</label>
-        
         <input type="number" name="year_min" placeholder="from"><br><br>
-
         <label></label>
         <input type="number" name="year_max" placeholder="to"><br><br>
+        
+        <label>Genre:</label><br>
+        <select name="genre">
+            <option value="">-- Select a Genre --</option>
+            {% for genre in genres %}
+            <option value="{{ genre }}">{{ genre.capitalize() }}</option>
+            {% endfor %}
+        </select><br><br>
 
         <label>Choose type of similarity:</label>
         <select name="measure">

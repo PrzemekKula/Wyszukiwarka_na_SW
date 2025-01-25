@@ -23,6 +23,7 @@ vectorizer = None        # Obiekt TfidfVectorizer
 doc_lsi = None           # Macierz wektorów w przestrzeni LSI (n_docs x n_components)
 lsi_pipeline = None      # Pipeline: TruncatedSVD + Normalizer
 db_path = "movies_database.db"
+genres_list = None
 
 def load_data_and_build_tfidf():
     """
@@ -35,14 +36,23 @@ def load_data_and_build_tfidf():
     global movies_data, doc_texts, doc_sets
     global tfidf_matrix, vectorizer
     global doc_lsi, lsi_pipeline
+    global genres_list  # Dodajemy globalną listę gatunków
 
     conn = sqlite3.connect(db_path)
-    query = "SELECT ID, Title, Year, Description FROM movies"
+    query = "SELECT ID, Title, Year, Description, Genres FROM movies"
     df = pd.read_sql_query(query, conn)
     conn.close()
 
     df["Title"] = df["Title"].fillna("")
     df["Description"] = df["Description"].fillna("")
+    df["Genres"] = df["Genres"].fillna("")
+
+    # Wyodrębnij unikalne gatunki
+    all_genres = set()
+    for genres in df["Genres"]:
+        for genre in genres.split(","):
+            all_genres.add(genre.strip().lower())
+    genres_list = sorted(all_genres)  # Posortowana lista gatunków
 
     # Pobierz listę stopwords
     try:
@@ -168,12 +178,13 @@ def movie_details(movie_id):
 @app.route('/search', methods=['GET', 'POST'])
 def search():
     global movies_data, doc_sets, tfidf_matrix, vectorizer
-    global doc_lsi, lsi_pipeline
+    global doc_lsi, lsi_pipeline, genres_list
 
     if request.method == 'POST':
         user_query = request.form.get('query', '').strip()
         year_min = request.form.get('year_min', '').strip()
         year_max = request.form.get('year_max', '').strip()
+        genre_filter = request.form.get('genre', '').strip().lower()
         measure = request.form.get('measure', 'cosine')
         user_query = user_query.lower()
 
@@ -194,18 +205,23 @@ def search():
         user_query_tokens = [t for t in user_query.lower().split() if t not in stop_words]
         user_query = " ".join(user_query_tokens)
 
-        # Filtrowanie danych po roku
+        # Filtrowanie danych
         df_filtered = movies_data.copy()
         try:
+            # Filtrowanie po roku
             if year_min:
                 df_filtered = df_filtered[df_filtered["Year"] >= int(year_min)]
             if year_max:
                 df_filtered = df_filtered[df_filtered["Year"] <= int(year_max)]
+
+            # Filtrowanie po gatunkach
+            if genre_filter:
+                df_filtered = df_filtered[df_filtered["Genres"].str.contains(genre_filter, case=False, na=False)]
         except ValueError:
-            return render_template('search.html', show_form=True, message="Nieprawidłowy zakres lat.")
+            return render_template('search.html', show_form=True, message="Nieprawidłowy wybór filtra.", genres=genres_list)
 
         if df_filtered.empty:
-            return render_template('search.html', show_form=True, message="Brak wyników w podanym zakresie lat.")
+            return render_template('search.html', show_form=True, message="Brak wyników dla podanych kryteriów.", genres=genres_list)
 
         # Dalej: logika similarity i renderowanie wyników
         similarities = []
@@ -237,9 +253,10 @@ def search():
                 </a>
             """)
 
-        return render_template('search.html', show_form=True, message=message, results=results)
+        return render_template('search.html', show_form=True, message=message, results=results, genres=genres_list)
 
-    return render_template('search.html', show_form=True)
+    return render_template('search.html', show_form=True, genres=genres_list)
+
 
 if __name__ == "__main__":
     load_data_and_build_tfidf()
