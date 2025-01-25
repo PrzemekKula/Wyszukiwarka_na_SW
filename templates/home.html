@@ -1,2 +1,6 @@
 <h1>Movie search engine</h1>
 <p>To start searching click <a href="{{ url_for('search') }}">HERE</a>.</p>
+<!-- Przycisk przenoszący do /statistics -->
+<button onclick="window.location.href='{{ url_for('statistics_view') }}'">
+    Show Statistics
+</button>

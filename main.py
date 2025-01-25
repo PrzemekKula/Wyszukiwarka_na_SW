@@ -275,6 +275,57 @@ def search():
 
     return render_template('search.html', show_form=True, genres=genres_list)
 
+@app.route("/statistics")
+def statistics_view():
+    """
+    Endpoint wyświetlający podstawowe statystyki (KPI) oraz wykres (np. rozkład ocen).
+    """
+    global movies_data
+
+    # Sprawdź, czy dane są wczytane
+    if movies_data is None or movies_data.empty:
+        return "No movie data loaded."
+
+    # Bierzemy wszystkie dostępne oceny (bez NaN)
+    rating_series = movies_data["Rating"].dropna()
+
+    # Tworzymy osobną serię bez zer
+    rating_series_no_zero = rating_series[rating_series != 0]
+
+    # Liczba filmów (możesz chcieć wykluczyć też te z oceną = 0, ale to już decyzja biznesowa)
+    total_movies = len(movies_data)
+
+    if not rating_series_no_zero.empty:
+        # Średnia i minimum tylko dla ocen > 0
+        avg_rating = round(rating_series_no_zero.mean(), 2)
+        min_rating = rating_series_no_zero.min()
+    else:
+        # Jeśli nie mamy żadnych ocen > 0, ustawiamy domyślne wartości
+        avg_rating = 0
+        min_rating = 0
+
+    # Maksymalną ocenę obliczamy z całej serii (uwzględniamy też 0, ale to i tak nie wpłynie na max)
+    if not rating_series.empty:
+        max_rating = rating_series.max()
+    else:
+        max_rating = 0
+
+    # Przygotowanie danych do wykresu
+    # - jeśli chcesz również pominąć 0 przy wyświetlaniu słupków, użyj rating_series_no_zero
+    rating_counts = rating_series_no_zero.apply(lambda x: int(round(x))).value_counts().sort_index()
+    chart_labels = rating_counts.index.tolist()  # np. [0, 1, 2, 3, ...]
+    chart_values = rating_counts.values.tolist()
+
+    return render_template(
+        "statistics.html",
+        total_movies=total_movies,
+        avg_rating=avg_rating,
+        min_rating=min_rating,
+        max_rating=max_rating,
+        chart_labels=chart_labels,
+        chart_values=chart_values
+    )
+
 
 if __name__ == "__main__":
     load_data_and_build_tfidf()
