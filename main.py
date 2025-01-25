@@ -39,13 +39,15 @@ def load_data_and_build_tfidf():
     global genres_list  # Dodajemy globalną listę gatunków
 
     conn = sqlite3.connect(db_path)
-    query = "SELECT ID, Title, Year, Description, Genres FROM movies"
+    query = "SELECT ID, Title, Year, Description, Genres, Rating, [No of Persons Voted] FROM movies"
     df = pd.read_sql_query(query, conn)
     conn.close()
 
     df["Title"] = df["Title"].fillna("")
     df["Description"] = df["Description"].fillna("")
     df["Genres"] = df["Genres"].fillna("")
+    df["Rating"] = pd.to_numeric(df["Rating"], errors="coerce").fillna(0)
+    df["No of Persons Voted"] = pd.to_numeric(df["No of Persons Voted"], errors="coerce").fillna(0)
 
     # Wyodrębnij unikalne gatunki
     all_genres = set()
@@ -185,6 +187,11 @@ def search():
         year_min = request.form.get('year_min', '').strip()
         year_max = request.form.get('year_max', '').strip()
         genre_filter = request.form.get('genre', '').strip().lower()
+        rating_min = request.form.get('rating_min', '').strip()
+        rating_max = request.form.get('rating_max', '').strip()
+        votes_min = request.form.get('votes_min', '').strip()
+        votes_max = request.form.get('votes_max', '').strip()
+
         measure = request.form.get('measure', 'cosine')
         user_query = user_query.lower()
 
@@ -217,6 +224,17 @@ def search():
             # Filtrowanie po gatunkach
             if genre_filter:
                 df_filtered = df_filtered[df_filtered["Genres"].str.contains(genre_filter, case=False, na=False)]
+            
+            if rating_min:
+                df_filtered = df_filtered[df_filtered["Rating"] >= float(rating_min)]
+            if rating_max:
+                df_filtered = df_filtered[df_filtered["Rating"] <= float(rating_max)]
+
+            # Filtrowanie po liczbie głosów
+            if votes_min:
+                df_filtered = df_filtered[df_filtered["No of Persons Voted"] >= int(votes_min)]
+            if votes_max:
+                df_filtered = df_filtered[df_filtered["No of Persons Voted"] <= int(votes_max)]
         except ValueError:
             return render_template('search.html', show_form=True, message="Nieprawidłowy wybór filtra.", genres=genres_list)
 

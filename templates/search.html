@@ -26,6 +26,14 @@
             {% endfor %}
         </select><br><br>
 
+        <label>Rating:</label><br>
+        <input type="number" step="0.1" name="rating_min" placeholder="Min rating"><br><br>
+        <input type="number" step="0.1" name="rating_max" placeholder="Max rating"><br><br>
+
+        <label>Votes:</label><br>
+        <input type="number" name="votes_min" placeholder="Min votes"><br><br>
+        <input type="number" name="votes_max" placeholder="Max votes"><br><br>
+
         <label>Choose type of similarity:</label>
         <select name="measure">
             <option value="cosine">Cosine measure(TF-IDF)</option>
