@@ -290,55 +290,59 @@ def search():
 
     return render_template('search.html', show_form=True, genres=genres_list)
 
-@app.route("/statistics")
-def statistics_view():
+@app.route("/KPIs", methods=["GET", "POST"])
+def KPIs_view():
     """
-    Endpoint wyświetlający podstawowe statystyki (KPI) oraz wykres (np. rozkład ocen).
+    Endpoint wyświetlający statystyki filmów z możliwością filtrowania po gatunku i
+    listę filmów o minimalnym/maksymalnym ratingu.
     """
-    global movies_data
+    global movies_data, genres_list
 
-    # Sprawdź, czy dane są wczytane
+    # Sprawdź, czy dane są załadowane
     if movies_data is None or movies_data.empty:
-        return "No movie data loaded."
+        return "No movie data available."
 
-    # Bierzemy wszystkie dostępne oceny (bez NaN)
-    rating_series = movies_data["Rating"].dropna()
+    # Pobieranie wybranego gatunku z formularza (POST)
+    selected_genre = request.form.get("genre", "")
+    show_movies_for = request.form.get("show_movies_for", "")  # MinRating lub MaxRating
 
-    # Tworzymy osobną serię bez zer
-    rating_series_no_zero = rating_series[rating_series != 0]
-
-    # Liczba filmów (możesz chcieć wykluczyć też te z oceną = 0, ale to już decyzja biznesowa)
-    total_movies = len(movies_data)
-
-    if not rating_series_no_zero.empty:
-        # Średnia i minimum tylko dla ocen > 0
-        avg_rating = round(rating_series_no_zero.mean(), 2)
-        min_rating = rating_series_no_zero.min()
+    # Filtrowanie danych po wybranym gatunku
+    if selected_genre:
+        filtered_data = (
+            movies_data
+            .dropna(subset=["Genres"])  # Pomija filmy bez gatunków
+            .assign(Genres=lambda df: df["Genres"].str.split(","))  # Rozdziela wielokrotne gatunki
+            .explode("Genres")  # Rozdziela wiersze na podstawie wielu gatunków
+            .query("Genres.str.strip().str.lower() == @selected_genre.lower()")  # Filtrowanie po wybranym gatunku
+        )
     else:
-        # Jeśli nie mamy żadnych ocen > 0, ustawiamy domyślne wartości
-        avg_rating = 0
-        min_rating = 0
+        filtered_data = movies_data
 
-    # Maksymalną ocenę obliczamy z całej serii (uwzględniamy też 0, ale to i tak nie wpłynie na max)
-    if not rating_series.empty:
-        max_rating = rating_series.max()
+    # KPI – średnia, minimalna i maksymalna ocena (uwzględniają tylko oceny > 0)
+    valid_ratings = filtered_data.query("Rating > 0")["Rating"]
+    if not valid_ratings.empty:
+        avg_rating = round(valid_ratings.mean(), 2)
+        min_rating = round(valid_ratings.min(), 2)
+        max_rating = round(valid_ratings.max(), 2)
     else:
-        max_rating = 0
+        avg_rating = min_rating = max_rating = 0
 
-    # Przygotowanie danych do wykresu
-    # - jeśli chcesz również pominąć 0 przy wyświetlaniu słupków, użyj rating_series_no_zero
-    rating_counts = rating_series_no_zero.apply(lambda x: int(round(x))).value_counts().sort_index()
-    chart_labels = rating_counts.index.tolist()  # np. [0, 1, 2, 3, ...]
-    chart_values = rating_counts.values.tolist()
+    # Przygotowanie listy filmów o min/max ratingu, jeśli wybrano odpowiednią akcję
+    selected_movies = []
+    if show_movies_for == "MinRating" and min_rating > 0:
+        selected_movies = filtered_data.query("Rating == @min_rating")[["ID", "Title", "Rating"]].to_dict(orient="records")
+    elif show_movies_for == "MaxRating" and max_rating > 0:
+        selected_movies = filtered_data.query("Rating == @max_rating")[["ID", "Title", "Rating"]].to_dict(orient="records")
 
     return render_template(
-        "statistics.html",
-        total_movies=total_movies,
+        "KPIs.html",
+        total_movies=len(filtered_data),
         avg_rating=avg_rating,
         min_rating=min_rating,
         max_rating=max_rating,
-        chart_labels=chart_labels,
-        chart_values=chart_values
+        genres=genres_list,
+        selected_genre=selected_genre,
+        selected_movies=selected_movies
     )
 
 
