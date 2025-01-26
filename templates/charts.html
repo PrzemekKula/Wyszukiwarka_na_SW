@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Charts</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <style>
+        /* Ogólne style */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: Arial, sans-serif;
+            background-image: url("{{ url_for('static', filename='lotr.png') }}");
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-position: center;
+            color: white;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(105, 103, 101, 0.7);
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 50px auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            max-width: 100%;
+        }
+
+        .main-button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .main-button:hover {
+            background-color: #357ab8;
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay"></div>
+    <div class="container">
+        <h1>Movie Charts</h1>
+        
+        {% if message %}
+            <p>{{ message }}</p>
+        {% else %}
+            <canvas id="chart"></canvas>
+            <script>
+                const ctx = document.getElementById('chart').getContext('2d');
+                const chartData = {
+                    labels: {{ decades|tojson }},
+                    datasets: [{
+                        label: 'Average Ratings by Decade',
+                        data: {{ avg_ratings|tojson }},
+                        backgroundColor: 'rgba(128, 128, 128, 0.8)', // Szare słupki
+                        borderColor: 'rgba(128, 128, 128, 1)',
+                        borderWidth: 1
+                    }]
+                };
+
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: chartData,
+                    options: {
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                min: 6,
+                                max: 8,
+                                title: {
+                                    display: true,
+                                    text: 'Average Rating',
+                                    color: 'white' // Biały kolor tytułu osi Y
+                                },
+                                ticks: {
+                                    color: 'white' // Biały kolor podpisów osi Y
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Decade',
+                                    color: 'white' // Biały kolor tytułu osi X
+                                },
+                                ticks: {
+                                    color: 'white' // Biały kolor podpisów osi X
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false // Ukrycie legendy
+                            },
+                            datalabels: {
+                                color: 'white', // Kolor etykiet
+                                anchor: 'end',
+                                align: 'top',
+                                formatter: (value) => value.toFixed(2) // Zaokrąglanie do 1 miejsca po przecinku
+                            }
+                        }
+                    },
+                    plugins: [ChartDataLabels] // Aktywacja pluginu datalabels
+                });
+            </script>
+        {% endif %}
+
+        <a href="{{ url_for('home') }}" class="main-button">Main Page</a>
+    </div>
+</body>
+</html>

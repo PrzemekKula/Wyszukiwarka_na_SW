@@ -39,7 +39,7 @@ def load_data_and_build_tfidf():
     global genres_list  # Dodajemy globalną listę gatunków
 
     conn = sqlite3.connect(db_path)
-    query = "SELECT ID, Title, Year, Description, Genres, Rating, [No of Persons Voted] FROM movies"
+    query = "SELECT ID, Title, Year, Description, Genres, Rating, [No of Persons Voted], Decade FROM movies"
     df = pd.read_sql_query(query, conn)
     conn.close()
 
@@ -48,6 +48,8 @@ def load_data_and_build_tfidf():
     df["Genres"] = df["Genres"].fillna("")
     df["Rating"] = pd.to_numeric(df["Rating"], errors="coerce").fillna(0)
     df["No of Persons Voted"] = pd.to_numeric(df["No of Persons Voted"], errors="coerce").fillna(0)
+    df["Decade"] = df["Decade"].fillna("")  # Jeśli Decade może zawierać wartości null
+
 
     # Wyodrębnij unikalne gatunki
     all_genres = set()
@@ -344,6 +346,39 @@ def KPIs_view():
         selected_genre=selected_genre,
         selected_movies=selected_movies
     )
+
+@app.route('/charts')
+def charts_view():
+    global movies_data
+    
+    # Sprawdź, czy dane są załadowane
+    if movies_data is None or movies_data.empty:
+        return render_template("charts.html", message="No movie data available.")
+    
+    try:
+        # Filtrowanie: pomijamy filmy z oceną 0 i brakującymi wartościami w kolumnie Decade
+        filtered_data = movies_data[(movies_data['Rating'] > 0) & (movies_data['Decade'].notnull())]
+        
+        # Grupowanie danych i obliczanie średnich ocen
+        decade_avg_ratings = filtered_data.groupby("Decade")["Rating"].mean().sort_index()
+
+        # Sprawdź, czy grupowanie zwróciło dane
+        if decade_avg_ratings.empty:
+            return render_template("charts.html", message="No data available for the chart.")
+
+        # Przygotowanie danych do wykresu
+        decades = decade_avg_ratings.index.tolist()  # Osi X: nazwy dekad
+        avg_ratings = [round(r, 2) for r in decade_avg_ratings.values]  # Osi Y: średnie oceny
+
+        # Renderowanie szablonu z danymi
+        return render_template(
+            "charts.html",
+            decades=decades,
+            avg_ratings=avg_ratings
+        )
+
+    except Exception as e:
+        return render_template("charts.html", message=f"Error processing chart data: {str(e)}")
 
 
 if __name__ == "__main__":
