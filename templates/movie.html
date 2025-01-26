@@ -5,21 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Movie Details</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
+        /* Resetowanie marginesów i ustawienie pełnoekranowego tła */
+        body, html {
+            margin: 0;
             padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: Arial, sans-serif;
         }
+
+        /* Tło obrazka */
+        body {
+            background-image: url("{{ url_for('static', filename='lotr.png') }}");
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-position: center;
+            color: white;
+        }
+
+        /* Nakładka z przezroczystością */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); /* Czarna warstwa z przezroczystością */
+            z-index: -1;
+        }
+
+        /* Główna zawartość */
         .container {
             max-width: 800px;
-            margin: 0 auto;
+            margin: 50px auto;
+            background: rgba(255, 255, 255, 0.1); /* Lekko przezroczyste tło */
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
         }
+
         h1 {
             margin-bottom: 20px;
+            font-size: 2rem;
+            text-align: center;
+            color: white;
         }
+
         p {
             margin: 10px 0;
+            font-size: 1.2rem;
         }
+
+        strong {
+            color: #f2c94c; /* Wyróżnienie dla etykiet */
+        }
+
+        /* Przycisk */
         button {
             background-color: #4a90e2;
             color: white;
@@ -29,13 +71,31 @@
             font-size: 1rem;
             cursor: pointer;
             margin-top: 20px;
+            transition: background-color 0.3s ease, transform 0.2s ease;
         }
+
         button:hover {
             background-color: #357ab8;
+            transform: scale(1.05);
+        }
+
+        button:active {
+            background-color: #2c6399;
+        }
+
+        /* Dodatkowy styl dla przycisków */
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
         }
     </style>
 </head>
 <body>
+    <!-- Nakładka -->
+    <div class="overlay"></div>
+
+    <!-- Główna zawartość -->
     <div class="container">
         {% if movie %}
         <h1>Movie Details</h1>
@@ -53,9 +113,10 @@
         {% endif %}
 
         <!-- Przycisk "Go Back" -->
-        <button onclick="history.back()">Go Back</button>
-
-        <a href="{{ url_for('home') }}"><button>Main Page</button></a>
+        <div class="button-container">
+            <button onclick="history.back()">Go Back</button>
+            <a href="{{ url_for('home') }}"><button>Main Page</button></a>
+        </div>
     </div>
 </body>
 </html>

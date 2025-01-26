@@ -269,7 +269,7 @@ def search():
                 similarity = similarities[local_idx]
                 highlighted_title = highlight_terms(row['Title'], user_query)
                 results.append(f"""
-                    {highlighted_title} ({row['Year']}) [similarity={similarity:.2f}]
+                    {highlighted_title} ({row['Year']})
                     <a href="{url_for('movie_details', movie_id=row['ID'])}">
                         <button>Details</button>
                     </a>
