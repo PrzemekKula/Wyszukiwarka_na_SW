@@ -225,6 +225,7 @@ def search():
             if genre_filter:
                 df_filtered = df_filtered[df_filtered["Genres"].str.contains(genre_filter, case=False, na=False)]
             
+            # Filtrowanie po ocenach
             if rating_min:
                 df_filtered = df_filtered[df_filtered["Rating"] >= float(rating_min)]
             if rating_max:
@@ -241,35 +242,49 @@ def search():
         if df_filtered.empty:
             return render_template('search.html', show_form=True, message="Brak wyników dla podanych kryteriów.", genres=genres_list)
 
-        # Dalej: logika similarity i renderowanie wyników
+        # Logika dopasowania wyników
         similarities = []
         filtered_indices = df_filtered.index.tolist()
-        query_set = set(user_query.lower().split())
-        query_vec = vectorizer.transform([user_query])
 
-        if measure == 'jaccard':
-            similarities = [jaccard_similarity(query_set, doc_sets[i]) for i in filtered_indices]
-        elif measure == 'lsi':
-            query_lsi = lsi_pipeline.transform(query_vec)
-            sub_doc_lsi = doc_lsi[filtered_indices, :]
-            similarities = cosine_similarity(query_lsi, sub_doc_lsi).flatten().tolist()
+        # Jeśli podano zapytanie tekstowe
+        if user_query:
+            query_set = set(user_query.lower().split())
+            query_vec = vectorizer.transform([user_query])
+
+            if measure == 'jaccard':
+                similarities = [jaccard_similarity(query_set, doc_sets[i]) for i in filtered_indices]
+            elif measure == 'lsi':
+                query_lsi = lsi_pipeline.transform(query_vec)
+                sub_doc_lsi = doc_lsi[filtered_indices, :]
+                similarities = cosine_similarity(query_lsi, sub_doc_lsi).flatten().tolist()
+            else:
+                sub_tfidf_matrix = tfidf_matrix[filtered_indices, :]
+                similarities = cosine_similarity(query_vec, sub_tfidf_matrix).flatten().tolist()
+
+            sorted_indices = sorted(range(len(similarities)), key=lambda i: similarities[i], reverse=True)
+            results = []
+            for local_idx in sorted_indices[:6]:  # Ogranicz do 6 wyników
+                real_index = filtered_indices[local_idx]
+                row = df_filtered.loc[real_index]
+                similarity = similarities[local_idx]
+                highlighted_title = highlight_terms(row['Title'], user_query)
+                results.append(f"""
+                    {highlighted_title} ({row['Year']}) [similarity={similarity:.2f}]
+                    <a href="{url_for('movie_details', movie_id=row['ID'])}">
+                        <button>Details</button>
+                    </a>
+                """)
         else:
-            sub_tfidf_matrix = tfidf_matrix[filtered_indices, :]
-            similarities = cosine_similarity(query_vec, sub_tfidf_matrix).flatten().tolist()
-
-        sorted_indices = sorted(range(len(similarities)), key=lambda i: similarities[i], reverse=True)
-        results = []
-        for local_idx in sorted_indices[:10]:
-            real_index = filtered_indices[local_idx]
-            row = df_filtered.loc[real_index]
-            similarity = similarities[local_idx]
-            highlighted_title = highlight_terms(row['Title'], user_query)
-            results.append(f"""
-                {highlighted_title} ({row['Year']}) [similarity={similarity:.2f}]
+            # Jeśli NIE podano zapytania tekstowego, wyświetl wszystkie pasujące filmy
+            results = [
+                f"""
+                {row['Title']} ({row['Year']})
                 <a href="{url_for('movie_details', movie_id=row['ID'])}">
                     <button>Details</button>
                 </a>
-            """)
+                """
+                for _, row in df_filtered.iterrows()
+            ]
 
         return render_template('search.html', show_form=True, message=message, results=results, genres=genres_list)
 

@@ -2,64 +2,183 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Movie search engine</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Search Engine</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.5rem;
+        }
+
+        main {
+            padding: 20px;
+            max-width: 800px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        form label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: inline-block;
+            color: #555;
+        }
+
+        form input, form select, form button {
+            width: 100%;
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+
+        form button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            border: none;
+            transition: background-color 0.3s ease;
+        }
+
+        form button:hover {
+            background-color: #0056b3;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        ul li {
+            margin: 10px 0;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        ul li a button {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.3s ease;
+        }
+
+        ul li a button:hover {
+            background-color: #218838;
+        }
+
+        .message {
+            background-color: #ffefc1;
+            color: #856404;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .main-button {
+            display: inline-block;
+            text-align: center;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+
+        .main-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 <body>
-    <h1>Movie search engine</h1>
-    
-    <!-- Formularz -->
-    {% if show_form %}
-    <form method="POST">
-        <label>Enter movie's title:</label><br>
-        <input type="text" name="query" placeholder="Search..." /><br><br>
+    <header>Movie Search Engine</header>
+    <main>
+        <h1>Search for a movie</h1>
 
-        <label>Year:</label>
-        <input type="number" name="year_min" placeholder="from"><br><br>
-        <label></label>
-        <input type="number" name="year_max" placeholder="to"><br><br>
-        
-        <label>Genre:</label><br>
-        <select name="genre">
-            <option value="">-- Select a Genre --</option>
-            {% for genre in genres %}
-            <option value="{{ genre }}">{{ genre.capitalize() }}</option>
+        <!-- Formularz -->
+        {% if show_form %}
+        <form method="POST">
+            <label for="query">Enter movie's title:</label>
+            <input type="text" id="query" name="query" placeholder="Search...">
+
+            <label for="year_min">Years (1970 to 2024):</label>
+            <input type="number" id="year_min" name="year_min" placeholder="from">
+            <input type="number" id="year_max" name="year_max" placeholder="to">
+
+            <label for="genre">Genre:</label>
+            <select id="genre" name="genre">
+                <option value="">-- Select a Genre --</option>
+                {% for genre in genres %}
+                <option value="{{ genre }}">{{ genre.capitalize() }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="rating_min">Rating (0 to 10):</label>
+            <input type="number" step="0.1" id="rating_min" name="rating_min" placeholder="Min rating">
+            <input type="number" step="0.1" id="rating_max" name="rating_max" placeholder="Max rating">
+
+            <label for="votes_min">Votes:</label>
+            <input type="number" id="votes_min" name="votes_min" placeholder="Min votes">
+            <input type="number" id="votes_max" name="votes_max" placeholder="Max votes">
+
+            <label for="measure">Type of similarity:</label>
+            <select id="measure" name="measure">
+                <option value="cosine">Cosine measure (TF-IDF)</option>
+                <option value="jaccard">Jaccard Index (set-based)</option>
+                <option value="lsi">LSI (SVD + cosine)</option>
+            </select>
+
+            <button type="submit">Search</button>
+        </form>
+        {% endif %}
+
+        <!-- Komunikat lub wyniki -->
+        {% if message %}
+        <div class="message">
+            {{ message|safe }}
+        </div>
+        {% endif %}
+
+        {% if results %}
+        <ul>
+            {% for result_item in results %}
+            <li>{{ result_item|safe }}</li>
             {% endfor %}
-        </select><br><br>
+        </ul>
+        {% endif %}
 
-        <label>Rating:</label><br>
-        <input type="number" step="0.1" name="rating_min" placeholder="Min rating"><br><br>
-        <input type="number" step="0.1" name="rating_max" placeholder="Max rating"><br><br>
-
-        <label>Votes:</label><br>
-        <input type="number" name="votes_min" placeholder="Min votes"><br><br>
-        <input type="number" name="votes_max" placeholder="Max votes"><br><br>
-
-        <label>Choose type of similarity:</label>
-        <select name="measure">
-            <option value="cosine">Cosine measure(TF-IDF)</option>
-            <option value="jaccard">Jaccard Index (set-based)</option>
-            <option value="lsi">LSI (SVD + cosinus)</option>
-        </select><br><br>
-
-        <button type="submit">Search</button>
-    </form>
-    {% endif %}
-    
-    <!-- Komunikat lub wyniki -->
-    {% if message %}
-    <div style="margin-top:20px;">
-        {{ message|safe }}
-    </div>
-    {% endif %}
-
-    {% if results %}
-    <ul>
-        {% for result_item in results %}
-        <li>{{ result_item|safe }}</li>
-        {% endfor %}
-    </ul>
-    {% endif %}
-
-    <a href="{{ url_for('home') }}"><button>Main page</button></a>
+        <a class="main-button" href="{{ url_for('home') }}">Main page</a>
+    </main>
 </body>
 </html>
