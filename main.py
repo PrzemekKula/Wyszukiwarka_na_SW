@@ -39,7 +39,7 @@ def load_data_and_build_tfidf():
     global genres_list  # Dodajemy globalną listę gatunków
 
     conn = sqlite3.connect(db_path)
-    query = "SELECT ID, Title, Year, Description, Genres, Rating, [No of Persons Voted], Decade FROM movies"
+    query = "SELECT ID, Title, Year, Description, Genres, Rating, [No of Persons Voted], Decade, [Rating Category] FROM movies"
     df = pd.read_sql_query(query, conn)
     conn.close()
 
@@ -48,7 +48,8 @@ def load_data_and_build_tfidf():
     df["Genres"] = df["Genres"].fillna("")
     df["Rating"] = pd.to_numeric(df["Rating"], errors="coerce").fillna(0)
     df["No of Persons Voted"] = pd.to_numeric(df["No of Persons Voted"], errors="coerce").fillna(0)
-    df["Decade"] = df["Decade"].fillna("")  # Jeśli Decade może zawierać wartości null
+    df["Decade"] = df["Decade"].fillna("")
+    df["Rating Category"] = df["Rating Category"].fillna("")  # Jeśli Decade może zawierać wartości null
 
 
     # Wyodrębnij unikalne gatunki
@@ -350,36 +351,62 @@ def KPIs_view():
 @app.route('/charts')
 def charts_view():
     global movies_data
-    
-    # Sprawdź, czy dane są załadowane
-    if movies_data is None or movies_data.empty:
-        return render_template("charts.html", message="No movie data available.")
-    
-    try:
-        # Filtrowanie: pomijamy filmy z oceną 0 i brakującymi wartościami w kolumnie Decade
-        filtered_data = movies_data[(movies_data['Rating'] > 0) & (movies_data['Decade'].notnull())]
-        
-        # Grupowanie danych i obliczanie średnich ocen
-        decade_avg_ratings = filtered_data.groupby("Decade")["Rating"].mean().sort_index()
 
-        # Sprawdź, czy grupowanie zwróciło dane
-        if decade_avg_ratings.empty:
-            return render_template("charts.html", message="No data available for the chart.")
+    # Filtrowanie danych: pomijamy oceny 0
+    filtered_data = movies_data[movies_data['Rating'] > 0]
 
-        # Przygotowanie danych do wykresu
-        decades = decade_avg_ratings.index.tolist()  # Osi X: nazwy dekad
-        avg_ratings = [round(r, 2) for r in decade_avg_ratings.values]  # Osi Y: średnie oceny
+    # Przygotowanie danych dla wykresu kolumnowego
+    decade_avg_ratings = (
+        filtered_data.groupby('Decade')['Rating'].mean()
+        .round(2)  # Zaokrąglamy średnie oceny do dwóch miejsc po przecinku
+    )
 
-        # Renderowanie szablonu z danymi
-        return render_template(
-            "charts.html",
-            decades=decades,
-            avg_ratings=avg_ratings
+    # Przygotowanie danych dla wykresu kołowego
+    excellent_movies = movies_data[movies_data['Rating Category'] == 'Excellent']
+
+    if not excellent_movies.empty:
+        # Rozdzielenie gatunków i zliczenie liczby wystąpień każdego gatunku
+        genres_count = (
+            excellent_movies['Genres'].str.split(',')
+            .explode()  # Rozdziela wielokrotne gatunki na osobne wiersze
+            .str.strip()  # Usuwa zbędne spacje
+            .value_counts()
         )
 
-    except Exception as e:
-        return render_template("charts.html", message=f"Error processing chart data: {str(e)}")
+        # Obliczenie procentowego udziału
+        total_excellent = genres_count.sum()
+        genre_percentages = ((genres_count / total_excellent) * 100).round(2)
 
+        # Wybranie 5 największych kategorii
+        top_genres = genre_percentages.head(5)
+        other_genres_percentage = genre_percentages[5:].sum()
+
+        # Dodanie kategorii "Others" (jeśli istnieją inne kategorie)
+        if other_genres_percentage > 0:
+            top_genres["Others"] = other_genres_percentage
+
+        # Przygotowanie danych do wykresu kołowego
+        genres = top_genres.index.tolist()
+        genre_percentages = top_genres.tolist()
+    else:
+        genres = []
+        genre_percentages = []
+
+    # Jeśli brakuje danych dla któregokolwiek wykresu, pokaż komunikat
+    if decade_avg_ratings.empty or not genres:
+        return render_template("charts.html", message="No data available for the charts.")
+
+    # Przygotowanie danych do szablonu
+    decades = [f"{decade}" for decade in decade_avg_ratings.index]
+    avg_ratings = decade_avg_ratings.tolist()
+
+    return render_template(
+        "charts.html",
+        decades=decades,
+        avg_ratings=avg_ratings,
+        genres=genres,
+        genre_percentages=genre_percentages
+    )
 
 if __name__ == "__main__":
     load_data_and_build_tfidf()

@@ -22,28 +22,31 @@
             color: white;
         }
 
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(105, 103, 101, 0.7);
-            z-index: -1;
-        }
-
         .container {
-            max-width: 900px;
+            max-width: 1200px;
             margin: 50px auto;
-            background: rgba(255, 255, 255, 0.1);
+            background-color: #333; /* Solidne szare tło */
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
             text-align: center;
         }
 
-        h1 {
-            margin-bottom: 20px;
+        .charts-wrapper {
+            display: flex;
+            gap: 20px;
+            justify-content: space-around;
+            flex-wrap: wrap;
+        }
+
+        .chart-container {
+            flex: 1;
+            min-width: 400px;
+            max-width: 45%;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
         }
 
         canvas {
@@ -69,71 +72,118 @@
     </style>
 </head>
 <body>
-    <div class="overlay"></div>
     <div class="container">
         <h1>Movie Charts</h1>
         
         {% if message %}
             <p>{{ message }}</p>
         {% else %}
-            <canvas id="chart"></canvas>
-            <script>
-                const ctx = document.getElementById('chart').getContext('2d');
-                const chartData = {
-                    labels: {{ decades|tojson }},
-                    datasets: [{
-                        label: 'Average Ratings by Decade',
-                        data: {{ avg_ratings|tojson }},
-                        backgroundColor: 'rgba(128, 128, 128, 0.8)', // Szare słupki
-                        borderColor: 'rgba(128, 128, 128, 1)',
-                        borderWidth: 1
-                    }]
-                };
+        <div class="charts-wrapper">
+            <!-- Wykres kolumnowy -->
+            <div class="chart-container">
+                <h2>Average Ratings by Decade</h2>
+                <canvas id="chartBar"></canvas>
+            </div>
 
-                new Chart(ctx, {
-                    type: 'bar',
-                    data: chartData,
-                    options: {
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                min: 6,
-                                max: 8,
-                                title: {
-                                    display: true,
-                                    text: 'Average Rating',
-                                    color: 'white' // Biały kolor tytułu osi Y
-                                },
-                                ticks: {
-                                    color: 'white' // Biały kolor podpisów osi Y
-                                }
+            <!-- Wykres kołowy -->
+            <div class="chart-container">
+                <h2>Genre Distribution for "Excellent" Movies (movies rated 8.0 or higher)</h2>
+                <canvas id="chartPie"></canvas>
+            </div>
+        </div>
+
+        <script>
+            // Wykres kolumnowy
+            const ctxBar = document.getElementById('chartBar').getContext('2d');
+            const barChartData = {
+                labels: {{ decades|tojson }},
+                datasets: [{
+                    label: 'Average Ratings by Decade',
+                    data: {{ avg_ratings|tojson }},
+                    backgroundColor: 'rgba(500, 128, 128, 0.8)', // Szare słupki
+                    borderColor: 'rgba(0, 0, 0, 0)',
+                    borderWidth: 1
+                }]
+            };
+
+            new Chart(ctxBar, {
+                type: 'bar',
+                data: barChartData,
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            min: 6,
+                            max: 8,
+                            title: {
+                                display: true,
+                                text: 'Average Rating',
+                                color: 'white' // Biały kolor tytułu osi Y
                             },
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Decade',
-                                    color: 'white' // Biały kolor tytułu osi X
-                                },
-                                ticks: {
-                                    color: 'white' // Biały kolor podpisów osi X
-                                }
+                            ticks: {
+                                color: 'white' // Biały kolor podpisów osi Y
                             }
                         },
-                        plugins: {
-                            legend: {
-                                display: false // Ukrycie legendy
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Decade',
+                                color: 'white' // Biały kolor tytułu osi X
                             },
-                            datalabels: {
-                                color: 'white', // Kolor etykiet
-                                anchor: 'end',
-                                align: 'top',
-                                formatter: (value) => value.toFixed(2) // Zaokrąglanie do 1 miejsca po przecinku
+                            ticks: {
+                                color: 'white' // Biały kolor podpisów osi X
                             }
                         }
                     },
-                    plugins: [ChartDataLabels] // Aktywacja pluginu datalabels
-                });
-            </script>
+                    plugins: {
+                        legend: {
+                            display: false // Ukrycie legendy
+                        },
+                        datalabels: {
+                            color: 'white', // Kolor etykiet
+                            anchor: 'end',
+                            align: 'top',
+                            formatter: (value) => value.toFixed(2) // Zaokrąglanie do 2 miejsc po przecinku
+                        }
+                    }
+                },
+                plugins: [ChartDataLabels] // Aktywacja pluginu datalabels
+            });
+
+            // Wykres kołowy
+            const ctxPie = document.getElementById('chartPie').getContext('2d');
+            const pieChartData = {
+                labels: {{ genres|tojson }},
+                datasets: [{
+                    data: {{ genre_percentages|tojson }},
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(255, 205, 86, 0.7)',
+                        'rgba(201, 203, 207, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(255, 159, 64, 0.7)'
+                    ]
+                }]
+            };
+
+            new Chart(ctxPie, {
+                type: 'pie',
+                data: pieChartData,
+                options: {
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: 'white' // Kolor etykiet legendy
+                            }
+                        }
+                    }
+                }
+            });
+        </script>
         {% endif %}
 
         <a href="{{ url_for('home') }}" class="main-button">Main Page</a>
