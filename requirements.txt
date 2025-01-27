@@ -1,0 +1,8 @@
+# Libraries required:
+flask 
+pandas 
+scikit-learn 
+nltk 
+wordcloud 
+python-Levenshtein 
+matplotlib
