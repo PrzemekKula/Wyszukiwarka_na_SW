@@ -39,7 +39,7 @@ def load_data_and_build_tfidf():
     global genres_list  # Dodajemy globalną listę gatunków
 
     conn = sqlite3.connect(db_path)
-    query = "SELECT ID, Title, Year, Description, Genres, Rating, [No of Persons Voted], Decade, [Rating Category] FROM movies"
+    query = "SELECT ID, Title, Year, Description, Genres, Rating, [No of Persons Voted], Decade, [Rating Category], Popularity FROM movies"
     df = pd.read_sql_query(query, conn)
     conn.close()
 
@@ -50,6 +50,7 @@ def load_data_and_build_tfidf():
     df["No of Persons Voted"] = pd.to_numeric(df["No of Persons Voted"], errors="coerce").fillna(0)
     df["Decade"] = df["Decade"].fillna("")
     df["Rating Category"] = df["Rating Category"].fillna("")  # Jeśli Decade może zawierać wartości null
+    df["Popularity"] = df["Popularity"].fillna("")
 
 
     # Wyodrębnij unikalne gatunki
@@ -392,6 +393,21 @@ def charts_view():
         genres = []
         genre_percentages = []
 
+    # Przygotowanie danych dla tabeli "Very popular"
+    very_popular_movies = movies_data[movies_data['Popularity'] == 'Very popular']
+    if not very_popular_movies.empty:
+        genre_popularity_counts = (
+            very_popular_movies['Genres'].str.split(',')
+            .explode()
+            .str.strip()
+            .value_counts()
+        )
+        very_popular_data = [
+            (genre, count) for genre, count in genre_popularity_counts.items()
+        ]
+    else:
+        very_popular_data = []
+
     # Jeśli brakuje danych dla któregokolwiek wykresu, pokaż komunikat
     if decade_avg_ratings.empty or not genres:
         return render_template("charts.html", message="No data available for the charts.")
@@ -405,8 +421,10 @@ def charts_view():
         decades=decades,
         avg_ratings=avg_ratings,
         genres=genres,
-        genre_percentages=genre_percentages
+        genre_percentages=genre_percentages,
+        very_popular_data=very_popular_data  # Dane do tabeli
     )
+
 
 if __name__ == "__main__":
     load_data_and_build_tfidf()

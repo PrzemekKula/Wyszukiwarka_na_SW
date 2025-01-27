@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Movie Charts</title>
+    <title>Movies' Charts and Stats</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
     <style>
@@ -53,6 +53,27 @@
             max-width: 100%;
         }
 
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table th, table td {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px;
+            text-align: left;
+            color: white;
+        }
+
+        table th {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        table tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
         .main-button {
             margin-top: 20px;
             padding: 10px 20px;
@@ -73,7 +94,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Movie Charts</h1>
+        <h1>Movies' Charts and Stats</h1>
         
         {% if message %}
             <p>{{ message }}</p>
@@ -87,10 +108,29 @@
 
             <!-- Wykres kołowy -->
             <div class="chart-container">
-                <h2>Genre Distribution for "Excellent" Movies (movies rated 8.0 or higher)</h2>
+                <h2>Percentage Distribution for "Excellent" Movies by Genre (movies rated 8.0 or higher)</h2>
                 <canvas id="chartPie"></canvas>
             </div>
         </div>
+
+        <!-- Tabela -->
+        <h2>Number of "Very Popular" Movies by Genre (movies with at least 1000 votes)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Genre</th>
+                    <th>Number of movies acknowledged as "Very popular"</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for genre, count in very_popular_data %}
+                <tr>
+                    <td>{{ genre }}</td>
+                    <td>{{ count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 
         <script>
             // Wykres kolumnowy
@@ -100,7 +140,7 @@
                 datasets: [{
                     label: 'Average Ratings by Decade',
                     data: {{ avg_ratings|tojson }},
-                    backgroundColor: 'rgba(500, 128, 128, 0.8)', // Szare słupki
+                    backgroundColor: 'rgba(13, 75, 252, 0.86)', // Kolor słupków
                     borderColor: 'rgba(0, 0, 0, 0)',
                     borderWidth: 1
                 }]
@@ -118,36 +158,36 @@
                             title: {
                                 display: true,
                                 text: 'Average Rating',
-                                color: 'white' // Biały kolor tytułu osi Y
+                                color: 'white'
                             },
                             ticks: {
-                                color: 'white' // Biały kolor podpisów osi Y
+                                color: 'white'
                             }
                         },
                         x: {
                             title: {
                                 display: true,
                                 text: 'Decade',
-                                color: 'white' // Biały kolor tytułu osi X
+                                color: 'white'
                             },
                             ticks: {
-                                color: 'white' // Biały kolor podpisów osi X
+                                color: 'white'
                             }
                         }
                     },
                     plugins: {
                         legend: {
-                            display: false // Ukrycie legendy
+                            display: false
                         },
                         datalabels: {
-                            color: 'white', // Kolor etykiet
+                            color: 'white',
                             anchor: 'end',
                             align: 'top',
-                            formatter: (value) => value.toFixed(2) // Zaokrąglanie do 2 miejsc po przecinku
+                            formatter: (value) => value.toFixed(2)
                         }
                     }
                 },
-                plugins: [ChartDataLabels] // Aktywacja pluginu datalabels
+                plugins: [ChartDataLabels]
             });
 
             // Wykres kołowy
@@ -158,10 +198,10 @@
                     data: {{ genre_percentages|tojson }},
                     backgroundColor: [
                         'rgba(75, 192, 192, 0.7)',
-                        'rgba(255, 99, 132, 0.7)',
-                        'rgba(255, 205, 86, 0.7)',
-                        'rgba(201, 203, 207, 0.7)',
-                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 247, 15, 0.8)',
+                        'rgba(53, 32, 10, 0.86)',
+                        'rgba(38, 36, 35, 0.8)',
+                        'rgba(255, 0, 0, 0.86)',
                         'rgba(153, 102, 255, 0.7)',
                         'rgba(255, 159, 64, 0.7)'
                     ]
@@ -174,14 +214,26 @@
                 options: {
                     plugins: {
                         legend: {
-                            display: true,
-                            position: 'top',
-                            labels: {
-                                color: 'white' // Kolor etykiet legendy
-                            }
+                            display: false
+                        },
+                        datalabels: {
+                            formatter: (value, context) => {
+                                const genre = context.chart.data.labels[context.dataIndex];
+                                return `${genre}: ${value.toFixed(2)}%`;
+                            },
+                            color: 'white',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            anchor: 'center',
+                            align: 'end',
+                            offset: 20,
+                            padding: 5
                         }
                     }
-                }
+                },
+                plugins: [ChartDataLabels]
             });
         </script>
         {% endif %}
