@@ -10,7 +10,9 @@ from sklearn.preprocessing import Normalizer
 from Levenshtein import distance
 from nltk.corpus import stopwords
 import nltk
-
+from wordcloud import WordCloud
+import io
+from flask import send_file
 
 app = Flask(__name__)
 
@@ -425,6 +427,42 @@ def charts_view():
         very_popular_data=very_popular_data  # Dane do tabeli
     )
 
+@app.route('/cloud')
+def cloud_view():
+    global movies_data
+
+    # Pobieranie stop-słów
+    try:
+        stop_words = set(stopwords.words('english'))
+    except LookupError:
+        nltk.download('stopwords')
+        stop_words = set(stopwords.words('english'))
+
+    # Generowanie tekstu z kolumny Description
+    all_descriptions = ' '.join(movies_data['Description'].dropna())
+
+    # Oczyszczanie tekstu
+    all_descriptions = re.sub(r'[^\w\s]', '', all_descriptions)  # Usunięcie znaków interpunkcyjnych
+    all_descriptions = all_descriptions.lower()  # Zamiana na małe litery
+    words = all_descriptions.split()
+    filtered_words = [word for word in words if word not in stop_words and len(word) > 1]  # Usunięcie stop-słów i pojedynczych liter
+    cleaned_text = ' '.join(filtered_words)
+
+    # Generowanie chmury słów
+    wordcloud = WordCloud(
+        width=800,
+        height=400,
+        background_color='black',
+        colormap='Set2'
+    ).generate(cleaned_text)
+
+    # Zapis do bufora w pamięci
+    img_buffer = io.BytesIO()
+    wordcloud.to_image().save(img_buffer, format='PNG')
+    img_buffer.seek(0)
+
+    # Zwracanie obrazu jako odpowiedzi
+    return send_file(img_buffer, mimetype='image/png')
 
 if __name__ == "__main__":
     load_data_and_build_tfidf()
