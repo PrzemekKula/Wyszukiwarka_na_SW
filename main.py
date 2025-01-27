@@ -11,8 +11,8 @@ from Levenshtein import distance
 from nltk.corpus import stopwords
 import nltk
 from wordcloud import WordCloud
-import io
-from flask import send_file
+import os
+from flask import send_from_directory
 
 app = Flask(__name__)
 
@@ -427,42 +427,59 @@ def charts_view():
         very_popular_data=very_popular_data  # Dane do tabeli
     )
 
-@app.route('/cloud')
-def cloud_view():
-    global movies_data
+# Dodaj katalog na pliki tymczasowe
+TEMP_IMAGE_DIR = "static/temp_images"
+os.makedirs(TEMP_IMAGE_DIR, exist_ok=True)
 
-    # Pobieranie stop-słów
-    try:
-        stop_words = set(stopwords.words('english'))
-    except LookupError:
-        nltk.download('stopwords')
-        stop_words = set(stopwords.words('english'))
+@app.route('/cloud', methods=['GET', 'POST'])
+def cloud_view():
+    global movies_data, genres_list
+
+    selected_genre = request.form.get("genre", "")
+    
+    # Filtrowanie opisów na podstawie wybranego gatunku
+    if selected_genre:
+        filtered_data = (
+            movies_data[movies_data['Genres'].str.contains(selected_genre, case=False, na=False)]
+            .dropna(subset=['Description'])
+        )
+    else:
+        filtered_data = movies_data.dropna(subset=['Description'])
+
+    # Sprawdź, czy są jakiekolwiek dane do przetworzenia
+    if filtered_data.empty:
+        return render_template("cloud.html", genres=genres_list, message="No descriptions available for this genre.")
 
     # Generowanie tekstu z kolumny Description
-    all_descriptions = ' '.join(movies_data['Description'].dropna())
-
-    # Oczyszczanie tekstu
-    all_descriptions = re.sub(r'[^\w\s]', '', all_descriptions)  # Usunięcie znaków interpunkcyjnych
-    all_descriptions = all_descriptions.lower()  # Zamiana na małe litery
-    words = all_descriptions.split()
-    filtered_words = [word for word in words if word not in stop_words and len(word) > 1]  # Usunięcie stop-słów i pojedynczych liter
-    cleaned_text = ' '.join(filtered_words)
+    all_descriptions = ' '.join(filtered_data['Description'])
 
     # Generowanie chmury słów
     wordcloud = WordCloud(
         width=800,
         height=400,
         background_color='black',
-        colormap='Set2'
-    ).generate(cleaned_text)
+        colormap='Set2',
+        stopwords=set(stopwords.words('english'))
+    ).generate(all_descriptions)
 
-    # Zapis do bufora w pamięci
-    img_buffer = io.BytesIO()
-    wordcloud.to_image().save(img_buffer, format='PNG')
-    img_buffer.seek(0)
+    # Zapis chmury słów do jednego pliku PNG
+    output_path = "static/wordcloud.png"
+    wordcloud.to_file(output_path)
 
-    # Zwracanie obrazu jako odpowiedzi
-    return send_file(img_buffer, mimetype='image/png')
+    # Zwracanie widoku z istniejącym plikiem
+    return render_template(
+        "cloud.html",
+        genres=genres_list,
+        selected_genre=selected_genre,
+        wordcloud_img_path=url_for('static', filename='wordcloud.png')
+    )
+
+@app.route('/static/temp_images/<filename>')
+def serve_temp_image(filename):
+    """
+    Serwowanie wygenerowanych obrazów z folderu tymczasowego.
+    """
+    return send_from_directory(TEMP_IMAGE_DIR, filename)
 
 if __name__ == "__main__":
     load_data_and_build_tfidf()
