@@ -17,8 +17,8 @@ from flask import send_from_directory
 app = Flask(__name__)
 
 # Globalne zmienne
-movies_data = None       # DataFrame: [ID, Title, Year, Description]
-doc_texts = None         # Lista tekstów (tytuł3x + opis)
+movies_data = None       # DataFrame
+doc_texts = None         # Lista tekstów (tytuł 3x + opis)
 doc_sets = None          # Lista zbiorów tokenów (na potrzeby Jaccard)
 tfidf_matrix = None      # Macierz TF-IDF
 vectorizer = None        # Obiekt TfidfVectorizer
@@ -28,17 +28,11 @@ db_path = "movies_database.db"
 genres_list = None
 
 def load_data_and_build_tfidf():
-    """
-    Jednorazowo wczytuje dane z bazy i tworzy:
-     - doc_texts: tekst z wzmocnionym tytułem
-     - doc_sets: zbiór tokenów do Jaccard
-     - tfidf_matrix, vectorizer (TF-IDF)
-     - doc_lsi, lsi_pipeline (LSI)
-    """
+
     global movies_data, doc_texts, doc_sets
     global tfidf_matrix, vectorizer
     global doc_lsi, lsi_pipeline
-    global genres_list  # Dodajemy globalną listę gatunków
+    global genres_list
 
     conn = sqlite3.connect(db_path)
     query = "SELECT ID, Title, Year, Description, Genres, Rating, [No of Persons Voted], Decade, [Rating Category], Popularity FROM movies"
@@ -54,22 +48,20 @@ def load_data_and_build_tfidf():
     df["Rating Category"] = df["Rating Category"].fillna("")  # Jeśli Decade może zawierać wartości null
     df["Popularity"] = df["Popularity"].fillna("")
 
-
-    # Wyodrębnij unikalne gatunki
     all_genres = set()
     for genres in df["Genres"]:
         for genre in genres.split(","):
             all_genres.add(genre.strip().lower())
     genres_list = sorted(all_genres)  # Posortowana lista gatunków
 
-    # Pobierz listę stopwords
+    # Lista stopwords
     try:
         stop_words = set(stopwords.words('english'))
     except LookupError:
         nltk.download('stopwords')
         stop_words = set(stopwords.words('english'))
 
-    # Budujemy listę tekstów (wzmacniamy tytuł 3×)
+    # Lista tekstów (wzmacniamy tytuł 3×)
     texts = []
     sets = []
     for _, row in df.iterrows():
@@ -78,10 +70,10 @@ def load_data_and_build_tfidf():
         weighted_title = (title + " ") * 3
         full_text = (weighted_title + description).strip()
 
-        # Zapisujemy do doc_texts
+        # Zapis do doc_texts
         texts.append(full_text)
 
-        # Tworzymy zbiór tokenów do Jaccard (ignorując stopwords)
+        # Zbiór tokenów do Jaccard (ignorując stopwords)
         tokens = full_text.lower().split()
         filtered_tokens = [t for t in tokens if t not in stop_words]
         sets.append(set(filtered_tokens))
@@ -96,7 +88,7 @@ def load_data_and_build_tfidf():
     pipeline = make_pipeline(svd, normalizer)
     X_lsi = pipeline.fit_transform(tfidf)
 
-    # Zapisujemy do zmiennych globalnych
+    # Zmienne globalne
     movies_data = df
     doc_texts = texts
     doc_sets = sets
@@ -107,7 +99,7 @@ def load_data_and_build_tfidf():
 
 def highlight_terms(text, query):
     """
-    Podkreśla (pogrubia) każde wystąpienie słów z query w danym text.
+    Pogrubia każde wystąpienie słów z zapytania w danym tytule.
     """
     terms = query.split()
     for t in terms:
@@ -116,9 +108,7 @@ def highlight_terms(text, query):
     return text
 
 def jaccard_similarity(setA: set, setB: set) -> float:
-    """
-    Miara Jaccarda = |A ∩ B| / |A ∪ B|.
-    """
+
     intersec = setA.intersection(setB)
     union = setA.union(setB)
     if len(union) == 0:
@@ -201,7 +191,7 @@ def search():
         measure = request.form.get('measure', 'cosine')
         user_query = user_query.lower()
 
-        # Stwórz słownik słów z danych
+        # Słownik słów z danych
         vocabulary = set(" ".join(movies_data['Title']).lower().split())
         vocabulary.update(" ".join(movies_data['Description']).lower().split())
 
@@ -269,7 +259,7 @@ def search():
 
             sorted_indices = sorted(range(len(similarities)), key=lambda i: similarities[i], reverse=True)
             results = []
-            for local_idx in sorted_indices[:6]:  # Ogranicz do 6 wyników
+            for local_idx in sorted_indices[:8]:  # Ogranicz do 8 wyników
                 real_index = filtered_indices[local_idx]
                 row = df_filtered.loc[real_index]
                 similarity = similarities[local_idx]
@@ -281,7 +271,7 @@ def search():
                     </a>
                 """)
         else:
-            # Jeśli NIE podano zapytania tekstowego, wyświetl wszystkie pasujące filmy
+            # Jeśli nie podano zapytania tekstowego, wyświetl wszystkie pasujące filmy
             results = [
                 f"""
                 {row['Title']} ({row['Year']})
@@ -304,11 +294,9 @@ def KPIs_view():
     """
     global movies_data, genres_list
 
-    # Sprawdź, czy dane są załadowane
     if movies_data is None or movies_data.empty:
         return "No movie data available."
 
-    # Pobieranie wybranego gatunku z formularza (POST)
     selected_genre = request.form.get("genre", "")
     show_movies_for = request.form.get("show_movies_for", "")  # MinRating lub MaxRating
 
@@ -384,7 +372,7 @@ def charts_view():
         top_genres = genre_percentages.head(5)
         other_genres_percentage = genre_percentages[5:].sum()
 
-        # Dodanie kategorii "Others" (jeśli istnieją inne kategorie)
+        # Dodanie pozostałych kategorii "Others"
         if other_genres_percentage > 0:
             top_genres["Others"] = other_genres_percentage
 
@@ -410,7 +398,6 @@ def charts_view():
     else:
         very_popular_data = []
 
-    # Jeśli brakuje danych dla któregokolwiek wykresu, pokaż komunikat
     if decade_avg_ratings.empty or not genres:
         return render_template("charts.html", message="No data available for the charts.")
 
@@ -427,7 +414,7 @@ def charts_view():
         very_popular_data=very_popular_data  # Dane do tabeli
     )
 
-# Dodaj katalog na pliki tymczasowe
+# Katalog na pliki tymczasowe
 TEMP_IMAGE_DIR = "static/temp_images"
 os.makedirs(TEMP_IMAGE_DIR, exist_ok=True)
 
@@ -446,7 +433,6 @@ def cloud_view():
     else:
         filtered_data = movies_data.dropna(subset=['Description'])
 
-    # Sprawdź, czy są jakiekolwiek dane do przetworzenia
     if filtered_data.empty:
         return render_template("cloud.html", genres=genres_list, message="No descriptions available for this genre.")
 
@@ -462,11 +448,9 @@ def cloud_view():
         stopwords=set(stopwords.words('english'))
     ).generate(all_descriptions)
 
-    # Zapis chmury słów do jednego pliku PNG
     output_path = "static/wordcloud.png"
     wordcloud.to_file(output_path)
 
-    # Zwracanie widoku z istniejącym plikiem
     return render_template(
         "cloud.html",
         genres=genres_list,
